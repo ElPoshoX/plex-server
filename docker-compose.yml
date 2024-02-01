@@ -1,0 +1,62 @@
+---
+version: "3.8"
+services:
+  samba:
+    image: dperson/samba # no hay tag con versiones, solo latest
+    container_name: $SAMBA_HOSTNAME
+    hostname: $SAMBA_HOSTNAME
+    command: '-u "$SAMBA_USER;$SAMBA_PASS" -s "drive;/drive;yes;no" -s "media;/media;yes;no" -s "downloads;/downloads;yes;no"'
+    stdin_open: true
+    tty: true
+    environment:
+      - TZ=$TZ
+    ports:
+      - 139:139
+      - 445:445
+    dns:
+      - $NETWORK_DNS
+    restart: always
+    networks:
+      - $NETWORK_NAME
+    volumes:
+      - $EXT_DRIVE_MEDIA:/media
+      - $EXT_DRIVE_STORAGE/torrents:/downloads
+      - $EXT_DRIVE:/drive
+
+  # Personalmente percibi mal performance si no uso network_mode: host
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: $PLEX_HOSTNAME
+    hostname: $PLEX_HOSTNAME
+    expose:
+      - 32400
+      - 33400
+    # Descomentar si NO usas network_mode: "host"
+    #ports:
+     #- 32400:32400
+     #- 33400:33400
+    environment:
+      - TZ=$TZ
+      - PUID=1000
+      - PGID=1000
+      - PLEX_CLAIM=$PLEX_CLAIM
+      - VERSION=$PLEX_VERSION_TYPE
+    dns:
+      - $NETWORK_DNS
+    labels:
+      caddy: plex.local
+      caddy.reverse_proxy: "{{upstreams 80}}"
+    volumes:
+      - $EXT_DRIVE_STORAGE/plex-server:/config
+      - $EXT_DRIVE_MEDIA/tv:/tv
+      - $EXT_DRIVE_MEDIA/movies:/movies
+      - $EXT_DRIVE_MEDIA/series:/series
+      - $EXT_DRIVE_STORAGE/tmp:/tmp
+      - $EXT_DRIVE_STORAGE/transcode:/transcode
+    restart: unless-stopped
+    network_mode: "host"
+
+networks:
+  home-server:
+    name: $NETWORK_NAME
+    external: true
